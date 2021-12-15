@@ -1,8 +1,7 @@
 '''
 '''
 from collections import namedtuple
-from collections import OrderedDict
-import sys
+import os
 
 import syntenyLibrary as SL
 
@@ -41,6 +40,9 @@ def mineSummaryFile(summary_file, genome_name):
                 genome_summary[current_gene] = Annotations(*annotations)
 
             line = file.readline().strip()
+    if count == 0:
+        raise ValueError(
+            f"Genome {genome_name} was not found in summary file!")
 
     return genome_summary
 
@@ -55,13 +57,13 @@ def mineOrthologFile(ortholog_file):
         while line:
             ortho_a, ortho_b = line.split('\t')[1:]
             if len(ortho_b.split(',')) > 1:  # Always go with first for B
-                ortho_b = ortho_b.split(',')[0]
+                ortho_b = ortho_b.split(',')[0].split('|')[0]
             if len(ortho_a.split(',')) > 1:
                 for ortho_x in ortho_a.split(','):
-                    ortho_x = ortho_x.strip()
+                    ortho_x = ortho_x.strip().split('|')[0]
                     ortholog_summary[ortho_x] = ortho_b
             else:
-                ortholog_summary[ortho_a] = ortho_b
+                ortholog_summary[ortho_a.split('|')[0]] = ortho_b.split('|')[0]
             line = file.readline().strip()
     return ortholog_summary, genome_a, genome_b
 
@@ -134,7 +136,6 @@ def mineGeneCalls(genecall_file, valid_gene_ids):
 
 
 def grabValidGeneIds(summary_file, genome_a, genome_b, gff_b):
-    print(genome_a)
     valid_gene_ids_a = list(mineSummaryFile(summary_file, genome_a).keys())
     # valid_gene_ids_b = list(mineSummaryFile(summary_file, genome_b).keys())
     valid_gene_ids_b = []
@@ -151,23 +152,28 @@ def traverseSynteny(gffA, gffB, orthologs, summary_file):
     synteny_dic = {}
 
     a_orthologs, genome_a, genome_b = mineOrthologFile(orthologs)
-    genome_a = 'Bin_174_Bacteroidaceae_Bacteroides_S'
-    print(genome_a)
-    print(genome_b)
+    print('a_orthologs')
+    SL.printNDicValues(a_orthologs, 10)
+    genome_a = 'Bin_111_Acidaminococcaceae_Phascolarctobacterium_SM'
+
     b_orthologs = {v: k for k, v in a_orthologs.items()}
+    print('b_orthologs')
+    SL.printNDicValues(b_orthologs, 10)
     orthologs = [a_orthologs, b_orthologs]
 
     valid_gene_ids_a, valid_gene_ids_b = grabValidGeneIds(
         summary_file, genome_a, genome_b, gffB)
+    print(valid_gene_ids_a[0:10])
+    print(valid_gene_ids_b[0:10])
 
-    print(f"Valid a gene ids: {len(valid_gene_ids_a)}")
-    print(valid_gene_ids_a)
-    print(f"Valid b gene ids: {len(valid_gene_ids_b)}")
-    print(valid_gene_ids_b)
     print('Analyzing A_synteny')
     a_synteny = mineGeneCalls(gffA, valid_gene_ids_a)
+    print('a_synteny')
+    SL.printNDicValues(a_synteny, 10)
     print('Analyzing B_synteny')
     b_synteny = mineGeneCalls(gffB, valid_gene_ids_b)
+    print('b_synteny')
+    SL.printNDicValues(b_synteny, 10)
     synteny = [a_synteny, b_synteny]
 
     logfile = 'Log-Debugger.txt'
@@ -179,7 +185,6 @@ def traverseSynteny(gffA, gffB, orthologs, summary_file):
     a_genes = list(a_synteny.keys())
     b_genes = list(b_synteny.keys())
     both_genes = [a_genes, b_genes]
-    print(len(a_genes))
 
     ignore_count = 0
     switch = 0
@@ -236,7 +241,7 @@ def traverseSynteny(gffA, gffB, orthologs, summary_file):
                         next_, direction_x = SL.setNextXGeneIfDirectionIsNeither(
                             x_synteny, ignore[switch])
 
-                if next_ == None:
+                if next_ is None:
                     break_ = True
                     append_ = False
                 elif SL.geneHasOrtholog(next_.gene, orthologs[switch], no_orthos):
@@ -374,14 +379,22 @@ def traverseSynteny(gffA, gffB, orthologs, summary_file):
 
 if __name__ == '__main__':
     summary_file = 'rawdata/AllPS-Genomes-Clean-21Sep21_gene_clusters_summary.NOAA.txt'
-    genome = 'Bin_174_Bacteroidaceae_Bacteroides_S'
-    ortholog_file = 'rawdata/174_Bacteroidaceae_Bacteroides_S__v__GCF_000012825.1_ASM1282v1_genomic.tsv'
-    gffA = 'rawdata/SupernatantGeneCalls.txt'
-    gffL = 'rawdata/GCF_000012825.1_ASM1282v1_genomic.gff'
+    genome = 'Bin_111_Acidaminococcaceae_Phascolarctobacterium_SM'
+
+    orth_prefix = 'rawdata/Orthologs-Acidaminococcaceae/Orthologues_111_Acidaminococcaceae_Phascolarctobacterium_SM/'
+    orth_file = '111_Acidaminococcaceae_Phascolarctobacterium_SM__v__111_Acidaminococcaceae_Phascolarctobacterium-SM-GCA_014648015.1.tsv'
+    ortholog_file = os.path.join(orth_prefix, orth_file)
+
+    gffA = 'rawdata/GFF-Internal/SupernatantGeneCalls.txt'
+    gffL = 'rawdata/GFF-Acidaminococcaceae/111_Acidaminococcaceae_Phascolarctobacterium-S*-GCA_014648015.1.gff'
+
     summary = mineSummaryFile(summary_file, genome)
+    SL.printNDicValues(summary, 10)
+
     a = traverseSynteny(gffA, gffL, ortholog_file, summary_file)
 
-    with open('SOA-Bin174_v_GCF000012825.1.txt', 'w') as out:
+    output = f'Output/test.txt'
+    with open(output, 'w') as out:
         out.write(f"Algoriphagus__UCCA\tAlgoriphagus_marincola\n")
         for seed in a:
             for gene_a, gene_b in zip(a[seed][0], a[seed][1]):
