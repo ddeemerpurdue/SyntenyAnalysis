@@ -1,92 +1,7 @@
 '''
 '''
-from collections import namedtuple
-import os
-import sys
-
 import syntenyLibrary as SL
-import syntenyClasses as SC
 
-
-def mineSummaryFile(summary_file, genome_name):
-    gene_to_annotation = {}
-    count = 0
-    with open(summary_file) as file:
-        line = file.readline()
-        while line:
-            CurrentEntry = SC.SummaryFileEntry(line)
-            if CurrentEntry.genome == genome_name:
-                gene_to_annotation[CurrentEntry.gene] = CurrentEntry.annotations
-                count += 1
-            line = file.readline().strip()
-    if count > 0:
-        return gene_to_annotation
-    else:
-        raise ValueError(
-            f'Genome: {genome_name} was not found in the summary file.')
-
-# a = mineSummaryFile(sfile, 'Algoriphagus__UCCA')
-
-
-def mineOrthologFile(ortholog_file):
-    # TODO - Add redundancy for multi-multi-hits
-    orthologs = namedtuple("Orthologs", "X, Y")
-    ortholog_summary_F = {}
-    with open(ortholog_file) as file:
-        next(file)
-        line = file.readline().strip()
-        while line:
-            CurrentOrthologEntry = SC.OrthologFileEntry(line)
-            for a_ortholog in CurrentOrthologEntry.a_orthologs:
-                ortholog_summary_F[a_ortholog] = CurrentOrthologEntry.b_ortholog
-            line = file.readline().strip()
-    ortholog_summary_R = {v: k for k, v in ortholog_summary_F.items()}
-    orthologs.X, orthologs.Y = ortholog_summary_F, ortholog_summary_R
-    return orthologs
-
-
-# mineOrthologFile(ortholog_file)
-
-
-def mineGeneCalls(genecall_file, valid_gene_ids):
-    gene_loci = {}
-    with open(genecall_file) as file:
-        if 'GCA' in genecall_file or 'GCF' in genecall_file:
-            next(file)  # Skip header :-)
-
-        current_line = file.readline().strip()
-        upstream_line = None
-        UpstreamGeneEntry = SC.GeneCallEntry('-')
-        while current_line:
-            CurrentGeneEntry = SC.GeneCallEntry(current_line)
-
-            if not SL.geneInValidGeneIDs(CurrentGeneEntry, valid_gene_ids):
-                upstream_line = current_line
-                current_line = file.readline().strip()
-                continue
-
-            if SL.sameContigAsUpstream(CurrentGeneEntry.contig, UpstreamGeneEntry.contig):
-                CurrentGeneEntry.setUpstreamEntry(upstream_line)
-                UpstreamGeneEntry.setDownstreamEntry(current_line)
-            else:
-                CurrentGeneEntry.setUpstreamEntry(None)
-                UpstreamGeneEntry.setDownstreamEntry(None)
-
-            if UpstreamGeneEntry.gene not in ['-', '+', 'x', None]:
-                gene_loci[UpstreamGeneEntry.gene] = UpstreamGeneEntry
-
-            UpstreamGeneEntry = CurrentGeneEntry
-            upstream_line = current_line
-            current_line = file.readline().strip()
-
-        UpstreamGeneEntry.setDownstreamEntry(None)
-
-        gene_loci[UpstreamGeneEntry.gene] = UpstreamGeneEntry
-
-    return gene_loci
-
-
-# genecalls = mineGeneCalls(genecall_file, 'all')
 
 def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
                     override=False, Ga=False, Gb=False):
@@ -96,10 +11,10 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
     genome_a, genome_b = SL.getGenomeNames(ortholog_file, override)
     # gene_to_annotation just provides us with annotations
     # Below has a built-in check that genome_a is indeed in the summary file
-    _gene_to_annotation_ = mineSummaryFile(summary_file, genome_a)
+    _gene_to_annotation_ = SL.mineSummaryFile(summary_file, genome_a)
 
     # Interal checks
-    _orthologs_ = mineOrthologFile(ortholog_file)
+    _orthologs_ = SL.mineOrthologFile(ortholog_file)
     # Checks we can match up these ortholog ids to the summary file
     SL.testSummaryGeneIDsMatchOrthologFile(_gene_to_annotation_, _orthologs_.X)
 
@@ -109,11 +24,11 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
 
     print('Analyzing A_synteny')
     print(f"GFF_a file: {gffA_file}")
-    a_synteny = mineGeneCalls(gffA_file, valid_gene_ids_a)
+    a_synteny = SL.mineGeneCalls(gffA_file, valid_gene_ids_a)
 
     print('Analyzing B_synteny')
     print(f"GFF_b file: {gffB_file}")
-    b_synteny = mineGeneCalls(gffB_file, valid_gene_ids_b)
+    b_synteny = SL.mineGeneCalls(gffB_file, valid_gene_ids_b)
     synteny = [a_synteny, b_synteny]
 
     SL.testValidGeneIDsLongerEqualSynteny(valid_gene_ids_a, a_synteny)

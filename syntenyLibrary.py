@@ -1,7 +1,82 @@
 '''
 '''
-import syntenyClasses as SC
+from collections import namedtuple
 import sys
+
+import syntenyClasses as SC
+
+
+def mineSummaryFile(summary_file, genome_name):
+    gene_to_annotation = {}
+    count = 0
+    with open(summary_file) as file:
+        line = file.readline()
+        while line:
+            CurrentEntry = SC.SummaryFileEntry(line)
+            if CurrentEntry.genome == genome_name:
+                gene_to_annotation[CurrentEntry.gene] = CurrentEntry.annotations
+                count += 1
+            line = file.readline().strip()
+    if count > 0:
+        return gene_to_annotation
+    else:
+        raise ValueError(
+            f'Genome: {genome_name} was not found in the summary file.')
+
+
+def mineOrthologFile(ortholog_file):
+    # TODO - Add redundancy for multi-multi-hits
+    orthologs = namedtuple("Orthologs", "X, Y")
+    ortholog_summary_F = {}
+    with open(ortholog_file) as file:
+        next(file)
+        line = file.readline().strip()
+        while line:
+            CurrentOrthologEntry = SC.OrthologFileEntry(line)
+            for a_ortholog in CurrentOrthologEntry.a_orthologs:
+                ortholog_summary_F[a_ortholog] = CurrentOrthologEntry.b_ortholog
+            line = file.readline().strip()
+    ortholog_summary_R = {v: k for k, v in ortholog_summary_F.items()}
+    orthologs.X, orthologs.Y = ortholog_summary_F, ortholog_summary_R
+    return orthologs
+
+
+def mineGeneCalls(genecall_file, valid_gene_ids):
+    gene_loci = {}
+    with open(genecall_file) as file:
+        if 'GCA' in genecall_file or 'GCF' in genecall_file:
+            next(file)  # Skip header :-)
+
+        current_line = file.readline().strip()
+        upstream_line = None
+        UpstreamGeneEntry = SC.GeneCallEntry('-')
+        while current_line:
+            CurrentGeneEntry = SC.GeneCallEntry(current_line)
+
+            if not geneInValidGeneIDs(CurrentGeneEntry, valid_gene_ids):
+                upstream_line = current_line
+                current_line = file.readline().strip()
+                continue
+
+            if sameContigAsUpstream(CurrentGeneEntry.contig, UpstreamGeneEntry.contig):
+                CurrentGeneEntry.setUpstreamEntry(upstream_line)
+                UpstreamGeneEntry.setDownstreamEntry(current_line)
+            else:
+                CurrentGeneEntry.setUpstreamEntry(None)
+                UpstreamGeneEntry.setDownstreamEntry(None)
+
+            if UpstreamGeneEntry.gene not in ['-', '+', 'x', None]:
+                gene_loci[UpstreamGeneEntry.gene] = UpstreamGeneEntry
+
+            UpstreamGeneEntry = CurrentGeneEntry
+            upstream_line = current_line
+            current_line = file.readline().strip()
+
+        UpstreamGeneEntry.setDownstreamEntry(None)
+
+        gene_loci[UpstreamGeneEntry.gene] = UpstreamGeneEntry
+
+    return gene_loci
 
 
 def printNDicValues(dict_, N):
