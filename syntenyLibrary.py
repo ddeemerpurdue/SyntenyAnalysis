@@ -1,6 +1,7 @@
 '''
 '''
 from collections import namedtuple
+import os
 import sys
 
 import syntenyClasses as SC
@@ -43,9 +44,10 @@ def mineOrthologFile(ortholog_file):
 
 def mineGeneCalls(genecall_file, valid_gene_ids):
     gene_loci = {}
-    with open(genecall_file) as file:
-        if 'GCA' in genecall_file or 'GCF' in genecall_file:
-            next(file)  # Skip header :-)
+    with open(genecall_file) as file:  # TODO: Below
+        if 'GCA' in genecall_file or 'GCF' in os.path.basename(genecall_file):
+            if '-' in os.path.basename(genecall_file):
+                next(file)  # Skip header :-)
 
         current_line = file.readline().strip()
         upstream_line = None
@@ -113,8 +115,9 @@ def grabValidGeneIds(gene_to_annotation, gff=False):
         valid_gene_ids = []
         with open(gff) as file:
             line = file.readline()
-            if 'GCA' in gff or 'GCF' in gff:
-                line = file.readline()
+            if 'GCA' in gff or 'GCF' in os.path.basename(gff):
+                if '-' in os.path.basename(gff):  # TODO
+                    line = file.readline()
             assert len(line.split('\t')) in [10, 11, 12], assertError
             while line:
                 valid_gene_ids.append(line.split('\t')[0])
@@ -212,9 +215,8 @@ def setCurrentOrthologsSynteny(GeneCallEntry, orthologs, synteny, switch):
     try:
         return synteny[switchFlag(switch)][current_ortholog]
     except KeyError:
-        print(
+        raise KeyError(
             f"Current ortholog:-{current_ortholog}- is not in synteny {switchFlag(switch)}")
-        sys.exit()
 
 
 def appendIgnore(ignore, gene):
@@ -385,24 +387,24 @@ def appendValues(values, switch, NextGene, NextOrtholog, direct):
     return 0
 
 
-def appendMiscValues(debug, switch, NextGene, NextOrtholog, direct):
+def appendMiscValues(loc_info, switch, NextGene, NextOrtholog, direct):
     testGeneCallEntry(NextGene)
     if direct == 'Forward':
-        debug[switch].append(
+        loc_info[switch].append(
             f"{NextGene.upstream_gene}-{NextGene.downstream_gene}\t{NextGene.start}-{NextGene.stop}")
-        debug[switchFlag(switch)].append(
-            f"{NextOrtholog.upstream_gene}-{NextOrtholog.downstream_gene}\t\t{NextOrtholog.start}-{NextOrtholog.stop}")
+        loc_info[switchFlag(switch)].append(
+            f"{NextOrtholog.upstream_gene}-{NextOrtholog.downstream_gene}\t{NextOrtholog.start}-{NextOrtholog.stop}")
     elif direct == 'Reverse':
-        debug[switch].insert(
+        loc_info[switch].insert(
             0, f"{NextGene.upstream_gene}-{NextGene.downstream_gene}\t{NextGene.start}-{NextGene.stop}")
-        debug[switchFlag(switch)].insert(
-            0, f"{NextOrtholog.upstream_gene}-{NextOrtholog.downstream_gene}\t\t{NextOrtholog.start}-{NextOrtholog.stop}")
+        loc_info[switchFlag(switch)].insert(
+            0, f"{NextOrtholog.upstream_gene}-{NextOrtholog.downstream_gene}\t{NextOrtholog.start}-{NextOrtholog.stop}")
     return 0
 
 
-def recordSyntenyInStone(synteny_dic, Seed, values):
+def recordSyntenyInStone(synteny_dic, Seed, values, loc_info):
     testGeneCallEntry(Seed)
-    synteny_dic[Seed.gene] = [values[0], values[1]]
+    synteny_dic[Seed.gene] = [values[0], values[1], loc_info[0], loc_info[1]]
 
 
 def testNext(direction_y, upstr_gene, downstr_gene):

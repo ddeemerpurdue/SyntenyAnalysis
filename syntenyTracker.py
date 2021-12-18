@@ -72,10 +72,12 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
 
         # Maybe a class or a named tuple?
         values = [[], []]
-        debug = [[], []]
+        loc_info = [[], []]
         # Add the current gene and current ortholog to values
         SL.addCurrentGeneToList(CurrentGene, values[0])  # Internal check
         SL.addCurrentGeneToList(CurrentOrtholog, values[1])
+        SL.addCurrentGeneToList(CurrentGene, loc_info[0])  # Fx - rearrange
+        SL.addCurrentGeneToList(CurrentOrtholog, loc_info[1])
 
         Seed = CurrentGene
         SeedOrtholog = CurrentOrtholog
@@ -180,10 +182,10 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
                     ignore, switch, NextGene.gene, NextOrtholog.gene)
                 SL.appendValues(values, switch, NextGene,
                                 NextOrtholog, seed_direction)
-                # SL.appendMiscValues(debug, switch, CurrentGene,
-                #                     CurrentOrtholog, seed_direction)
+                SL.appendMiscValues(loc_info, switch, NextGene,
+                                    NextOrtholog, seed_direction)
             if break_:
-                SL.recordSyntenyInStone(synteny_dic, Seed, values)
+                SL.recordSyntenyInStone(synteny_dic, Seed, values, loc_info)
                 append_ = False
                 break_ = False
                 break

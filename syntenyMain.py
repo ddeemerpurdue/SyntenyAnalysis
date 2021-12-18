@@ -3,7 +3,8 @@ import os
 
 import argparse
 
-import test as ST
+import syntenyLibrary as SL
+import syntenyTracker as ST
 
 
 def getBins(files):
@@ -23,7 +24,7 @@ def grabBinB(ortholog_file):
 
 
 def grabGffB(bin_b, family):
-    if any([string in bin_b for string in ['GCA', 'GCF']]):
+    if any([string in bin_b for string in ['GCA', 'GCF']]) and '-' in bin_b:
         gffB_file = glob.glob(f'rawdata/GFF-{family}/{bin_b}*.gff')
         assert len(gffB_file) == 1, 'Invalid gffB_file pattern matching!'
         gffB_file = gffB_file[0]
@@ -44,13 +45,13 @@ def writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary):
     with open(output, 'w') as out:
         out.write(f"{bin_a}\t{bin_b}\n")  # Update header
         for seed in synteny_dic:
-            for gene_a, gene_b in zip(synteny_dic[seed][0:2]):
+            for gene_a, gene_b, loc_a, loc_b in zip(synteny_dic[seed][0], synteny_dic[seed][1], synteny_dic[seed][2], synteny_dic[seed][3]):
                 if gene_a in ['-', '+']:
                     vals = '\t'.join(['', '', '', '', '', ''])
                 else:
                     vals = summary[gene_a]
                     vals = '\t'.join(vals)
-                out.write(f"{gene_a}\t{gene_b}\t{vals}\n")
+                out.write(f"{gene_a}\t{gene_b}\t{loc_a}\t{loc_b}\t{vals}\n")
             out.write(f"X\tX\n")
 
 
@@ -80,7 +81,7 @@ def main(family, summary_file):
             output = f'Output/{family}/{uniq_name}'
             print(f"\t\t\t\tWriting analysis results to file: {output}\n\n")
 
-            summary = ST.mineSummaryFile(summary_file, bin_a)
+            summary = SL.mineSummaryFile(summary_file, bin_a)
             synteny_dic = ST.traverseSynteny(summary_file, gffA_file, gffB_file,
                                              ortholog_file, Gb=Gb_flag)
 

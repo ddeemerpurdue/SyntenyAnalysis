@@ -1,126 +1,206 @@
+import glob
 import os
-import sys
 
-# summary = 'rawdata/All-PS-Summary.txt'
-# gff = 'rawdata/GFF-Internal/SupernatantGeneCalls.txt'
+import argparse
 
-# mydic = {}
-
-# with open(summary) as file:
-#     line = file.readline()
-#     line = file.readline()
-#     while line:
-#         bin_ = line.split('\t')[3]
-#         if bin_.endswith(('S', 'SM')):
-#             gene_id = line.split('\t')[4]
-#             mydic[gene_id] = bin_
-#         line = file.readline()
-
-# with open(gff) as file:
-#     line = file.readline()
-#     line = file.readline()
-#     while line:
-#         gene_id = line.split('\t')[0]
-#         if gene_id in mydic:
-#             output = f"rawdata/GFF-Internal/{mydic[gene_id]}.gff"
-#             with open(output, 'a') as out:
-#                 out.write(line)
-#         line = file.readline()
-
-# # val = 'dane_greg_deemer_allen'
-# # newval = val[0:-1] + 'X'
-# # print(newval)
-# # import os
-# # if os.path
-# # # if __name__ == '__main__':
-# # #     summary_file = 'rawdata/All-PS-Summary.txt'
-
-# # #     orth_prefix = 'rawdata/Orthologs-Acidaminococcaceae/Orthologues_111_Acidaminococcaceae_Phascolarctobacterium_SM/'
-# # #     orth_file = '111_Acidaminococcaceae_Phascolarctobacterium_SM__v__111_Acidaminococcaceae_Phascolarctobacterium-SM-GCA_014648015.1.tsv'
-# # #     ortholog_file = os.path.join(orth_prefix, orth_file)
-
-# # #     gffA_file = 'rawdata/GFF-Internal/111_Acidaminococcaceae_Phascolarctobacterium_SM.gff '
-# # #     gffB_file = 'rawdata/GFF-Acidaminococcaceae/111_Acidaminococcaceae_Phascolarctobacterium-S*-GCA_014648015.1.gff'
-
-# # #     summary = mineSummaryFile(
-# # #         summary_file, '111_Acidaminococcaceae_Phascolarctobacterium_SM')
-# # #     synteny_dic = traverseSynteny(summary_file, gffA_file, gffB_file,
-# # #                                   ortholog_file, Gb=gffB_file)
-
-# # #     output = f'Output/test.txt'
-# # #     with open(output, 'w') as out:
-# # #         out.write(f"GenomeA\tGenomeB\n")
-# # #         for seed in synteny_dic:
-# # #             for gene_a, gene_b in zip(synteny_dic[seed][0], synteny_dic[seed][1]):
-# # #                 if gene_a in ['-', '+']:
-# # #                     vals = '\t'.join(['', '', '', '', '', ''])
-# # #                 else:
-# # #                     vals = summary[gene_a]
-# # #                     vals = '\t'.join(vals)
-# # #                 out.write(f"{gene_a}\t{gene_b}\t{vals}\n")
-# # #             out.write(f"X\tX\n")
+import syntenyLibrary as SL
+import syntenyTracker as ST
 
 
-mystring = 'dane_gregory'
+def getBins(files):
+    mybins = []
+    for file in files:
+        bin_name = os.path.basename(file)
+        if any([string in bin_name for string in ['GCA', 'GCF']]):
+            pass
+        else:
+            mybins.append(bin_name.strip('Orthologues_'))
+    return mybins
 
 
-# import glob
-#     # family = 'Acidaminococcaceae'
-#     family = 'Desulfovibrionaceae'
-#     files = glob.glob(f'rawdata/Orthologs-{family}/*')
-#     mybins = []
-#     for file in files:
-#         bin_name = os.path.basename(file)
-#         if any([string in bin_name for string in ['GCA', 'GCF']]):
-#             pass
-#         else:
-#             mybins.append(bin_name.strip('Orthologues_'))
-#     summary_file = 'rawdata/All-PS-Summary.txt'
+def grabBinB(ortholog_file):
+    bin_b = os.path.basename(ortholog_file)
+    return bin_b.split('__v__')[1].strip('.tsv')
 
-#     print('Starting master analysis...')
-#     for bin_ in mybins:
-#         print(f"Analyzing data for bin: {bin_}")
-#         orth_prefix = f'rawdata/Orthologs-{family}/Orthologues_{bin_}/'
-#         print(f"\tOrtholog prefix: {orth_prefix}")
-#         for ortholog_file in glob.glob(f"{orth_prefix}/*"):
-#             print(f"\t\tMining ortho file: {os.path.basename(ortholog_file)}")
-#             bin_b = os.path.basename(ortholog_file)
-#             bin_b = bin_b.split('__v__')[1].strip('.tsv')
-#             print(f'\t\tAnalyzing {bin_} vs {bin_b}')
 
-#             gffA_file = f'rawdata/GFF-Internal/{bin_}.gff'
-#             if any([string in bin_b for string in ['GCA', 'GCF']]):
-#                 gffB_file = glob.glob(f'rawdata/GFF-{family}/{bin_b}*.gff')
-#                 assert len(
-#                     gffB_file) == 1, 'Invalid gffB_file pattern matching!'
-#                 gffB_file = gffB_file[0]
-#                 Gb_flag = gffB_file
-#             else:
-#                 gffB_file = f'rawdata/GFF-Internal/{bin_b}.gff'
-#                 Gb_flag = False
-#             print(f"\t\t\tGff a: {gffA_file}")
-#             print(f"\t\t\tGff b: {gffB_file}")
+def grabGffB(bin_b, family):
+    if any([string in bin_b for string in ['GCA', 'GCF']]) and '-' in bin_b:
+        gffB_file = glob.glob(f'rawdata/GFF-{family}/{bin_b}*.gff')
+        assert len(gffB_file) == 1, 'Invalid gffB_file pattern matching!'
+        gffB_file = gffB_file[0]
+        Gb_flag = gffB_file
+    else:
+        gffB_file = f'rawdata/GFF-Internal/{bin_b}.gff'
+        Gb_flag = False
+    return gffB_file, Gb_flag
 
-#             if os.path.exists(f"Output/{family}"):
-#                 pass
-#             else:
-#                 os.makedirs(f"Output/{family}")
 
-#             uniq_name = os.path.basename(ortholog_file)
-#             output = f'Output/{family}/{uniq_name}'
-#             print(f"\t\t\t\tWriting analysis results to file: {output}\n\n")
+def makeDir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return 0
 
-#             summary = mineSummaryFile(summary_file, bin_)
-#             synteny_dic = traverseSynteny(summary_file, gffA_file, gffB_file,
-#                                           ortholog_file, Gb=Gb_flag)
-#             with open(output, 'w') as out:
-#                 out.write(f"{bin_}\t{bin_b}\n")
-#                 for seed in synteny_dic:
-#                     for gene_a, gene_b in zip(synteny_dic[seed][0], synteny_dic[seed][1]):
-#                         if gene_a in ['-', '+']:
-#                             vals = '\t'.join(['', '', '', '', '', ''])
-#                         else:
-#                             vals = summary[gene_a]
-#                             vals = '\t'.join(vals)
-#                         out.write(f"{gene_a}\t{gene_b}\t{vals}\n")
-#                     out.write(f"X\tX\n")
+
+def writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary):
+    with open(output, 'w') as out:
+        out.write(f"{bin_a}\t{bin_b}\n")  # Update header
+        for seed in synteny_dic:
+            for gene_a, gene_b, loc_a, loc_b in zip(synteny_dic[seed][0], synteny_dic[seed][1], synteny_dic[seed][2], synteny_dic[seed][3]):
+                if gene_a in ['-', '+']:
+                    vals = '\t'.join(['', '', '', '', '', ''])
+                else:
+                    vals = summary[gene_a]
+                    vals = '\t'.join(vals)
+                out.write(f"{gene_a}\t{gene_b}\t{loc_a}\t{loc_b}\t{vals}\n")
+            out.write(f"X\tX\n")
+
+
+def main(family, summary_file):
+    files = glob.glob(f'rawdata/Orthologs-{family}/*')
+    mybins = getBins(files)
+
+    print(f'Starting master analysis:')
+
+    for bin_a in mybins:
+        print(f"Analyzing data for bin: {bin_a}")
+        orth_prefix = f'rawdata/Orthologs-{family}/Orthologues_{bin_a}/'
+        print(f"\tOrtholog prefix: {orth_prefix}")
+        for ortholog_file in glob.glob(f"{orth_prefix}/*"):
+            print(f"\t\tMining ortho file: {os.path.basename(ortholog_file)}")
+            bin_b = grabBinB(ortholog_file)
+            print(f'\t\tAnalyzing {bin_a} vs {bin_b}')
+
+            gffA_file = f'rawdata/GFF-Internal/{bin_a}.gff'
+            gffB_file, Gb_flag = grabGffB(bin_b, family)
+
+            print(f"\t\t\tGff a: {gffA_file}\n\t\t\tGff b: {gffB_file}")
+
+            makeDir(f"Output/{family}")
+
+            uniq_name = os.path.basename(ortholog_file)
+            output = f'Output/{family}/{uniq_name}'
+            print(f"\t\t\t\tWriting analysis results to file: {output}\n\n")
+
+            summary = SL.mineSummaryFile(summary_file, bin_a)
+            synteny_dic = ST.traverseSynteny(summary_file, gffA_file, gffB_file,
+                                             ortholog_file, Gb=Gb_flag)
+
+            uniq_name = os.path.basename(ortholog_file)
+            output = f'Output/{family}/{uniq_name}'
+            writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Parser")
+    parser.add_argument("-f", "--Family", help="Family",
+                        required=True)
+    parser.add_argument("-s", "--Summary", help="Summary file",
+                        required=True)
+    argument = parser.parse_args()
+    main(argument.Family, argument.Summary)
+
+
+#  MAIN FOR HOT LAKES
+import glob
+import os
+
+import argparse
+
+import syntenyLibrary as SL
+import syntenyTracker as ST
+
+
+def getBins(files):
+    mybins = []
+    for file in files:
+        bin_name = os.path.basename(file)
+        if any([string in bin_name for string in ['GCA', 'GCF']]):
+            pass
+        else:
+            mybins.append(bin_name.strip('Orthologues_'))
+    return mybins
+
+
+def grabBinB(ortholog_file):
+    bin_b = os.path.basename(ortholog_file)
+    return bin_b.split('__v__')[1].strip('.tsv')
+
+
+def grabGffB(bin_b, family):
+    if any([string in bin_b for string in ['GCA', 'GCF']]) and '-' in bin_b:
+        gffB_file = glob.glob(f'rawdata/GFF-{family}/{bin_b}*.gff')
+        assert len(gffB_file) == 1, 'Invalid gffB_file pattern matching!'
+        gffB_file = gffB_file[0]
+        Gb_flag = gffB_file
+    else:
+        gffB_file = f'rawdata/GFF-Internal/{bin_b}.gff'
+        Gb_flag = False
+    return gffB_file, Gb_flag
+
+
+def makeDir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return 0
+
+
+def writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary):
+    with open(output, 'w') as out:
+        out.write(f"{bin_a}\t{bin_b}\n")  # Update header
+        for seed in synteny_dic:
+            for gene_a, gene_b, loc_a, loc_b in zip(synteny_dic[seed][0], synteny_dic[seed][1], synteny_dic[seed][2], synteny_dic[seed][3]):
+                if gene_a in ['-', '+']:
+                    vals = '\t'.join(['', '', '', '', '', ''])
+                else:
+                    vals = summary[gene_a]
+                    vals = '\t'.join(vals)
+                out.write(f"{gene_a}\t{gene_b}\t{loc_a}\t{loc_b}\t{vals}\n")
+            out.write(f"X\tX\n")
+
+
+def main(family, summary_file):
+    files = glob.glob(f'rawdata/Orthologs-{family}/*')
+    mybins = getBins(files)
+
+    print(f'Starting master analysis:')
+
+    for bin_a in mybins:
+        print(f"Analyzing data for bin: {bin_a}")
+
+        orth_prefix = f'rawdata/Orthologs-{family}/Orthologues_{bin_a}/'
+
+        print(f"\tOrtholog prefix: {orth_prefix}")
+        for ortholog_file in glob.glob(f"{orth_prefix}/*"):
+            print(f"\t\tMining ortho file: {os.path.basename(ortholog_file)}")
+            bin_b = grabBinB(ortholog_file)
+            print(f'\t\tAnalyzing {bin_a} vs {bin_b}')
+
+            gffA_file = f'rawdata/GFF-All/{bin_a}.gff'
+            # gffB_file, Gb_flag = grabGffB(bin_b, family)
+            gffB_file = f'rawdata/GFF-All/{bin_b}.gff'
+
+            print(f"\t\t\tGff a: {gffA_file}\n\t\t\tGff b: {gffB_file}")
+
+            makeDir(f"Output/{family}")
+
+            uniq_name = os.path.basename(ortholog_file)
+            output = f'Output/{family}/{uniq_name}'
+            print(f"\t\t\t\tWriting analysis results to file: {output}\n\n")
+
+            summary = SL.mineSummaryFile(summary_file, bin_a)
+            synteny_dic = ST.traverseSynteny(summary_file, gffA_file, gffB_file,
+                                             ortholog_file)
+
+            uniq_name = os.path.basename(ortholog_file)
+            output = f'Output/{family}/{uniq_name}'
+            writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Parser")
+    parser.add_argument("-f", "--Family", help="Family",
+                        required=True)
+    parser.add_argument("-s", "--Summary", help="Summary file",
+                        required=True)
+    argument = parser.parse_args()
+    main(argument.Family, argument.Summary)
