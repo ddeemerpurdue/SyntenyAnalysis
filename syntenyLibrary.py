@@ -299,12 +299,14 @@ def endOfContig(GeneCallEntry, direction):
         return False
 
 
-def assignDirection(GeneCallEntry):
+def assignDirection(GeneCallEntry, CurrentSeedDirection):
     testGeneCallEntry(GeneCallEntry)
     if GeneCallEntry.upstream_gene == '-':
-        return ['Downstream', True]
+        CurrentSeedDirection.direction_y = 'Downstream'
+        return 0
     elif GeneCallEntry.downstream_gene == '+':
-        return ['Upstream', True]
+        CurrentSeedDirection.direction_y = 'Upstream'
+        return 0
     else:
         raise ValueError(
             f"{GeneCallEntry.gene} determined as end but is not the case.")

@@ -35,24 +35,19 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
     no_orthos = []
 
     ignore_count = 0
-    switch = 0
-    top_count = 0
     append_ = False
     break_ = False
 
     # Go through each valid_gene_id
-    for gene in valid_gene_ids_a:
+    for top_count, gene in enumerate(valid_gene_ids_a):
         switch = 0
-        top_count += 1
         CurrentSeedDirection = SC.SeedDirection()
 
         direction_y = 'Upstream'
 
-        # Turn ignore into a namedtuple?
         if SL.geneInIgnore(gene, ignore[switch]):
             ignore_count += 1
             continue
-        # Split the below function to add to no_orthos
         elif not SL.geneHasOrtholog(gene, _orthologs_):
             no_orthos.append(gene)
             continue
@@ -78,9 +73,9 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
         SeedOrtholog = CurrentOrtholog
 
         while True:
-            if SL.directionNotNeither(direction_x):  # TODO - IC
+            if SL.directionNotNeither(CurrentSeedDirection.direction_x):
                 NextGene = SL.setNextXGene(
-                    CurrentGene, direction_x, synteny[switch], ignore[switch])
+                    CurrentGene, CurrentSeedDirection.direction_x, synteny[switch], ignore[switch])
             else:
                 if SL.onlyOneGeneOnContig(CurrentGene):
                     append_ = True
@@ -90,8 +85,7 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
                     else:
                         break_ = True
                 else:
-                    # BELOW - SWITCH IS MESSED UP - 1 WHEN SHOULD BE 0
-                    NextGene, direction_x = SL.setNextXGeneIfDirectionIsNeither(
+                    NextGene, CurrentSeedDirection.direction_x = SL.setNextXGeneIfDirectionIsNeither(
                         CurrentGene, synteny[switch], ignore[switch])
 
             # TODO - Change this break - add the stuff after while broken?
@@ -108,33 +102,24 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
                 # Below is making a run without switching contigs/directions
                 # TODO - simplify
                 if NextOrtholog.gene == CurrentOrtholog.downstream_gene:
-                    direction_y = 'Downstream'
+                    CurrentSeedDirection.direction_y = 'Downstream'
                     append_ = True
                     CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
 
                 elif NextOrtholog.gene == CurrentOrtholog.upstream_gene:
-                    direction_y = 'Upstream'
+                    CurrentSeedDirection.direction_y = 'Downstream'
                     append_ = True
                     CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
 
                 else:
                     # Below, means let's try switching contigs or directions
-                    if SL.endOfContig(CurrentOrtholog, direction_y):
-                        if SL.endOfContig(NextOrtholog, direction='Neither'):
-                            direction_y, append_ = SL.assignDirection(
-                                NextOrtholog)
-                            CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
-                            append_ = True
-                        else:
-                            switch = 0
-                            # Below, we want to flip and search seed in opposite
-                            if CurrentSeedDirection.restartFromSeed():
-                                CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
-                            else:
-                                break_ = True
+                    if (SL.endOfContig(CurrentOrtholog, CurrentSeedDirection.direction_y) and
+                            SL.endOfContig(NextOrtholog, direction='Neither')):
+                        SL.assignDirection(NextOrtholog)
+                        CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
+                        append_ = True
                     else:
                         switch = 0
-                        # Below, we want to flip and search seed in opposite
                         if CurrentSeedDirection.restartFromSeed():
                             CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
                         else:
@@ -143,10 +128,9 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
             # SUB 1C - NEXT GENE IS ACTUALLY A +/-
             elif SL.geneIsEndFlag(NextGene):
                 CurrentGene, CurrentOrtholog = CurrentOrtholog, CurrentGene
-                direction_x = direction_y
-                direction_y = 'Neither'
+                CurrentSeedDirection.XtoYandYtoNeither()
 
-                if SL.endOfContig(CurrentGene, direction_x) or SL.onlyOneGeneOnContig(CurrentGene):
+                if SL.endOfContig(CurrentGene, CurrentSeedDirection.direction_x) or SL.onlyOneGeneOnContig(CurrentGene):
                     switch = 0
                     if CurrentSeedDirection.restartFromSeed():
                         CurrentGene, CurrentOrtholog = Seed, SeedOrtholog

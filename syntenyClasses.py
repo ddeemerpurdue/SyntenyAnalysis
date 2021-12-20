@@ -121,3 +121,7 @@ class SeedDirection:
             self.changeSeedAndXDirection()
             return True
         return False
+
+    def XtoYandYtoNeither(self):
+        self.direction_x = self.direction_y
+        self.direction_y = 'Neither'

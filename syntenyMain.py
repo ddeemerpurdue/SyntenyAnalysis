@@ -55,7 +55,7 @@ def writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary):
             out.write(f"X\tX\n")
 
 
-def writeNoOrthologs(output,)
+# def writeNoOrthologs(output,)
 
 
 def main(family, summary_file):
