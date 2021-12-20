@@ -1,5 +1,6 @@
 '''
 '''
+import syntenyClasses as SC
 import syntenyLibrary as SL
 
 
@@ -10,10 +11,8 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
     # Get the genome names for mining summary file
     genome_a, genome_b = SL.getGenomeNames(ortholog_file, override)
     # gene_to_annotation just provides us with annotations
-    # Below has a built-in check that genome_a is indeed in the summary file
     _gene_to_annotation_ = SL.mineSummaryFile(summary_file, genome_a)
 
-    # Interal checks
     _orthologs_ = SL.mineOrthologFile(ortholog_file)
     # Checks we can match up these ortholog ids to the summary file
     SL.testSummaryGeneIDsMatchOrthologFile(_gene_to_annotation_, _orthologs_.X)
@@ -22,12 +21,8 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
     valid_gene_ids_a = SL.grabValidGeneIds(_gene_to_annotation_, gffA_file)
     valid_gene_ids_b = SL.grabValidGeneIds(_gene_to_annotation_, gffB_file)
 
-    print('Analyzing A_synteny')
-    print(f"GFF_a file: {gffA_file}")
     a_synteny = SL.mineGeneCalls(gffA_file, valid_gene_ids_a)
 
-    print('Analyzing B_synteny')
-    print(f"GFF_b file: {gffB_file}")
     b_synteny = SL.mineGeneCalls(gffB_file, valid_gene_ids_b)
     synteny = [a_synteny, b_synteny]
 
@@ -49,8 +44,8 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
     for gene in valid_gene_ids_a:
         switch = 0
         top_count += 1
-        seed_direction = 'Forward'
-        direction_x = 'Downstream'
+        CurrentSeedDirection = SC.SeedDirection()
+
         direction_y = 'Upstream'
 
         # Turn ignore into a namedtuple?
@@ -90,9 +85,7 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
                 if SL.onlyOneGeneOnContig(CurrentGene):
                     append_ = True
                     switch = 0  # Dont think I need this
-                    if seed_direction == 'Forward':
-                        seed_direction = 'Reverse'
-                        direction_x = 'Upstream'
+                    if CurrentSeedDirection.restartFromSeed():
                         CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
                     else:
                         break_ = True
@@ -135,18 +128,14 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
                         else:
                             switch = 0
                             # Below, we want to flip and search seed in opposite
-                            if seed_direction == 'Forward':
-                                seed_direction = 'Reverse'
-                                direction_x = 'Upstream'
+                            if CurrentSeedDirection.restartFromSeed():
                                 CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
                             else:
                                 break_ = True
                     else:
                         switch = 0
                         # Below, we want to flip and search seed in opposite
-                        if seed_direction == 'Forward':
-                            seed_direction = 'Reverse'
-                            direction_x = 'Upstream'
+                        if CurrentSeedDirection.restartFromSeed():
                             CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
                         else:
                             break_ = True
@@ -159,9 +148,7 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
 
                 if SL.endOfContig(CurrentGene, direction_x) or SL.onlyOneGeneOnContig(CurrentGene):
                     switch = 0
-                    if seed_direction == 'Forward':
-                        seed_direction = 'Reverse'
-                        direction_x = 'Upstream'
+                    if CurrentSeedDirection.restartFromSeed():
                         CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
                     else:
                         break_ = True
@@ -170,9 +157,7 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
 
             else:
                 switch = 0
-                if seed_direction == 'Forward':
-                    seed_direction = 'Reverse'
-                    direction_x = 'Upstream'
+                if CurrentSeedDirection.restartFromSeed():
                     CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
                 else:
                     break_ = True
@@ -181,9 +166,9 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
                 SL.appendBothIgnore(
                     ignore, switch, NextGene.gene, NextOrtholog.gene)
                 SL.appendValues(values, switch, NextGene,
-                                NextOrtholog, seed_direction)
+                                NextOrtholog, CurrentSeedDirection.seed_direction)
                 SL.appendMiscValues(loc_info, switch, NextGene,
-                                    NextOrtholog, seed_direction)
+                                    NextOrtholog, CurrentSeedDirection.seed_direction)
             if break_:
                 SL.recordSyntenyInStone(synteny_dic, Seed, values, loc_info)
                 append_ = False
@@ -192,9 +177,10 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
             append_ = False
 
     print(f"Ignore1 :{len(ignore[0])} Ignore2: {len(ignore[1])}")
+    print(f"Ignore1 :{len(set(ignore[0]))} Ignore2: {len(set(ignore[1]))}")
     print(
         f"Counts:\nTop count: {top_count}\nIgnore: {ignore_count}")
     print(f"Set of no_orthos: {len(set(no_orthos))}")
-    # print(f"No orthos: {no_orthos}")
-    # print(f"{set(no_orthos)}")
-    return synteny_dic
+    print(f"No orthos: {no_orthos}")
+
+    return synteny_dic, no_orthos

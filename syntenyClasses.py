@@ -103,3 +103,21 @@ class GeneCallEntry:
             return True
         else:
             return False
+
+
+class SeedDirection:
+    def __init__(self):
+        self.seed_direction = 'Forward'
+        self.direction_x = 'Downstream'
+        self.direction_y = 'Upstream'
+
+    def changeSeedAndXDirection(self):
+        self.seed_direction = 'Reverse'
+        self.direction_x = 'Upstream'
+        return 0
+
+    def restartFromSeed(self):
+        if self.seed_direction == 'Forward':
+            self.changeSeedAndXDirection()
+            return True
+        return False

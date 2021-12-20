@@ -55,6 +55,9 @@ def writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary):
             out.write(f"X\tX\n")
 
 
+def writeNoOrthologs(output,)
+
+
 def main(family, summary_file):
     files = glob.glob(f'rawdata/Orthologs-{family}/*')
     mybins = getBins(files)
@@ -82,8 +85,8 @@ def main(family, summary_file):
             print(f"\t\t\t\tWriting analysis results to file: {output}\n\n")
 
             summary = SL.mineSummaryFile(summary_file, bin_a)
-            synteny_dic = ST.traverseSynteny(summary_file, gffA_file, gffB_file,
-                                             ortholog_file, Gb=Gb_flag)
+            synteny_dic, no_orthos = ST.traverseSynteny(summary_file, gffA_file, gffB_file,
+                                                        ortholog_file, Gb=Gb_flag)
 
             uniq_name = os.path.basename(ortholog_file)
             output = f'Output/{family}/{uniq_name}'
