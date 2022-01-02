@@ -1,21 +1,21 @@
-def divideByTwo(val):
-    return val / 2
+import matplotlib.pyplot as plt
+import networkx as nx
+
+orthologs = 'rawdata/Orthologs-Acidaminococcaceae/Orthologues_0_Acidaminococcaceae_Acidaminococcus_P/0_Acidaminococcaceae_Acidaminococcus_P__v__0_Acidaminococcaceae_Acidaminococcus-P-GCA_000425045.1.tsv'
 
 
-def random():
-    a = 10
-    if a > 5:
-        a = divideByTwo(a)
-    return a
+def readOrthologs(ortholog_file):
+    graph = nx.DiGraph()
+    with open(ortholog_file) as file:
+        next(file)
+        line = file.readline()
+        while line:
+            values = line.strip().split('\t')
+            values[1] = values[1].split('|')[0]
+            node = '-'.join(values[1:])
+            print(node)
+            line = file.readline()
+    return 0
 
 
-a = random()
-print(a)
-
-switch = 0
-if seed_direction == 'Forward':
-    seed_direction = 'Reverse'
-    direction_x = 'Upstream'
-    CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
-else:
-    break_ = True
+readOrthologs(orthologs)

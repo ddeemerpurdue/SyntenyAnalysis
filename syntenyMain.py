@@ -1,5 +1,6 @@
 import glob
 import os
+import sys
 
 import argparse
 
@@ -28,11 +29,9 @@ def grabGffB(bin_b, family):
         gffB_file = glob.glob(f'rawdata/GFF-{family}/{bin_b}*.gff')
         assert len(gffB_file) == 1, 'Invalid gffB_file pattern matching!'
         gffB_file = gffB_file[0]
-        Gb_flag = gffB_file
     else:
         gffB_file = f'rawdata/GFF-Internal/{bin_b}.gff'
-        Gb_flag = False
-    return gffB_file, Gb_flag
+    return gffB_file
 
 
 def makeDir(path):
@@ -41,21 +40,29 @@ def makeDir(path):
     return 0
 
 
-def writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary):
+def writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary, not_written):
+    a_not, b_not = not_written
     with open(output, 'w') as out:
         out.write(f"{bin_a}\t{bin_b}\n")  # Update header
         for seed in synteny_dic:
             for gene_a, gene_b, loc_a, loc_b in zip(synteny_dic[seed][0], synteny_dic[seed][1], synteny_dic[seed][2], synteny_dic[seed][3]):
                 if gene_a in ['-', '+']:
+                    print('GENE NOT IN!!!')
+                    sys.exit()
                     vals = '\t'.join(['', '', '', '', '', ''])
                 else:
                     vals = summary[gene_a]
                     vals = '\t'.join(vals)
                 out.write(f"{gene_a}\t{gene_b}\t{loc_a}\t{loc_b}\t{vals}\n")
             out.write(f"X\tX\n")
-
-
-# def writeNoOrthologs(output,)
+        # Writing non-orthologs
+        out.write(f'NotWrittenA\n')
+        for gene_a in a_not:
+            out.write(f"{gene_a}\n")
+        out.write('\n')
+        out.write(f'NotWrittenB\n')
+        for gene_b in b_not:
+            out.write(f"{gene_b}\n")
 
 
 def main(family, summary_file):
@@ -74,7 +81,7 @@ def main(family, summary_file):
             print(f'\t\tAnalyzing {bin_a} vs {bin_b}')
 
             gffA_file = f'rawdata/GFF-Internal/{bin_a}.gff'
-            gffB_file, Gb_flag = grabGffB(bin_b, family)
+            gffB_file = grabGffB(bin_b, family)
 
             print(f"\t\t\tGff a: {gffA_file}\n\t\t\tGff b: {gffB_file}")
 
@@ -85,12 +92,13 @@ def main(family, summary_file):
             print(f"\t\t\t\tWriting analysis results to file: {output}\n\n")
 
             summary = SL.mineSummaryFile(summary_file, bin_a)
-            synteny_dic, no_orthos = ST.traverseSynteny(summary_file, gffA_file, gffB_file,
-                                                        ortholog_file, Gb=Gb_flag)
+            synteny_dic, not_written = ST.traverseSynteny(summary_file, gffA_file, gffB_file,
+                                                          ortholog_file)
 
             uniq_name = os.path.basename(ortholog_file)
             output = f'Output/{family}/{uniq_name}'
-            writeSyntenyOutput(output, bin_a, bin_b, synteny_dic, summary)
+            writeSyntenyOutput(output, bin_a, bin_b,
+                               synteny_dic, summary, not_written)
 
 
 if __name__ == '__main__':

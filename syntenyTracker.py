@@ -1,20 +1,16 @@
-'''
-'''
 import syntenyClasses as SC
 import syntenyLibrary as SL
 
 
 def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
-                    override=False, Ga=False, Gb=False):
+                    override=False):
     synteny_dic = {}
 
-    # Get the genome names for mining summary file
     genome_a, genome_b = SL.getGenomeNames(ortholog_file, override)
-    # gene_to_annotation just provides us with annotations
-    _gene_to_annotation_ = SL.mineSummaryFile(summary_file, genome_a)
 
+    _gene_to_annotation_ = SL.mineSummaryFile(summary_file, genome_a)
     _orthologs_ = SL.mineOrthologFile(ortholog_file)
-    # Checks we can match up these ortholog ids to the summary file
+
     SL.testSummaryGeneIDsMatchOrthologFile(_gene_to_annotation_, _orthologs_.X)
 
     # Have the option to grab the validGeneIDs from summary_file or GFF
@@ -22,15 +18,12 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
     valid_gene_ids_b = SL.grabValidGeneIds(_gene_to_annotation_, gffB_file)
 
     a_synteny = SL.mineGeneCalls(gffA_file, valid_gene_ids_a)
-
     b_synteny = SL.mineGeneCalls(gffB_file, valid_gene_ids_b)
     synteny = [a_synteny, b_synteny]
 
     SL.testValidGeneIDsLongerEqualSynteny(valid_gene_ids_a, a_synteny)
     SL.testValidGeneIDsLongerEqualSynteny(valid_gene_ids_b, b_synteny)
 
-    direction_x = 'Downstream'
-    direction_y = 'Neither'
     ignore = [set(), set()]
     no_orthos = []
 
@@ -42,8 +35,6 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
     for top_count, gene in enumerate(valid_gene_ids_a):
         switch = 0
         CurrentSeedDirection = SC.SeedDirection()
-
-        direction_y = 'Upstream'
 
         if SL.geneInIgnore(gene, ignore[switch]):
             ignore_count += 1
@@ -66,8 +57,10 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
         # Add the current gene and current ortholog to values
         SL.addCurrentGeneToList(CurrentGene, values[0])  # Internal check
         SL.addCurrentGeneToList(CurrentOrtholog, values[1])
-        SL.addCurrentGeneToList(CurrentGene, loc_info[0])  # Fx - rearrange
-        SL.addCurrentGeneToList(CurrentOrtholog, loc_info[1])
+        # SL.addCurrentGeneToList(CurrentGene, loc_info[0])  # Fx - rearrange
+        # SL.addCurrentGeneToList(CurrentOrtholog, loc_info[1])
+        SL.appendMiscValues(loc_info, switch, CurrentGene,
+                            CurrentOrtholog, CurrentSeedDirection.direction_x)
 
         Seed = CurrentGene
         SeedOrtholog = CurrentOrtholog
@@ -99,20 +92,17 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
                 NextOrtholog = SL.setCurrentOrthologsSynteny(
                     NextGene, _orthologs_, synteny, switch)
 
-                # Below is making a run without switching contigs/directions
-                # TODO - simplify
                 if NextOrtholog.gene == CurrentOrtholog.downstream_gene:
                     CurrentSeedDirection.direction_y = 'Downstream'
                     append_ = True
                     CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
 
                 elif NextOrtholog.gene == CurrentOrtholog.upstream_gene:
-                    CurrentSeedDirection.direction_y = 'Downstream'
+                    CurrentSeedDirection.direction_y = 'Upstream'
                     append_ = True
                     CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
 
                 else:
-                    # Below, means let's try switching contigs or directions
                     if (SL.endOfContig(CurrentOrtholog, CurrentSeedDirection.direction_y) and
                             SL.endOfContig(NextOrtholog, direction='Neither')):
                         SL.assignDirection(NextOrtholog)
@@ -150,9 +140,9 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
                 SL.appendBothIgnore(
                     ignore, switch, NextGene.gene, NextOrtholog.gene)
                 SL.appendValues(values, switch, NextGene,
-                                NextOrtholog, CurrentSeedDirection.seed_direction)
+                                NextOrtholog, CurrentSeedDirection.direction_x)
                 SL.appendMiscValues(loc_info, switch, NextGene,
-                                    NextOrtholog, CurrentSeedDirection.seed_direction)
+                                    NextOrtholog, CurrentSeedDirection.direction_x)
             if break_:
                 SL.recordSyntenyInStone(synteny_dic, Seed, values, loc_info)
                 append_ = False
@@ -165,6 +155,9 @@ def traverseSynteny(summary_file, gffA_file, gffB_file, ortholog_file,
     print(
         f"Counts:\nTop count: {top_count}\nIgnore: {ignore_count}")
     print(f"Set of no_orthos: {len(set(no_orthos))}")
-    print(f"No orthos: {no_orthos}")
+    a_not_written = set(valid_gene_ids_a) - set(ignore[0])
+    b_not_written = set(valid_gene_ids_b) - set(ignore[1])
+    print(f"Not written for a: {len(a_not_written)}")
+    print(f"Not written for b: {len(b_not_written)}")
 
-    return synteny_dic, no_orthos
+    return synteny_dic, [a_not_written, b_not_written]

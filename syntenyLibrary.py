@@ -108,6 +108,7 @@ def getGenomeNames(ortholog_file, override):
 
 
 def grabValidGeneIds(gene_to_annotation, gff=False):
+    # TODO Can remove genetoannotation
     assertError = 'Invalid number of fields in GeneCallEntry when grabbing valid gene ids'
     if not gff:
         valid_gene_ids = list(gene_to_annotation.keys())
@@ -380,27 +381,34 @@ def switchFlag(flag):
 
 def appendValues(values, switch, NextGene, NextOrtholog, direct):
     testGeneCallEntry(NextGene)
-    if direct == 'Forward':
+    if direct == 'Downstream':
         values[switch].append(NextGene.gene)
         values[switchFlag(switch)].append(NextOrtholog.gene)
-    elif direct == 'Reverse':
+    elif direct == 'Upstream':
         values[switch].insert(0, NextGene.gene)
         values[switchFlag(switch)].insert(0, NextOrtholog.gene)
     return 0
 
 
 def appendMiscValues(loc_info, switch, NextGene, NextOrtholog, direct):
+    '''
+    Need some checks here
+    '''
     testGeneCallEntry(NextGene)
-    if direct == 'Forward':
-        loc_info[switch].append(
-            f"{NextGene.upstream_gene}-{NextGene.downstream_gene}\t{NextGene.start}-{NextGene.stop}")
-        loc_info[switchFlag(switch)].append(
-            f"{NextOrtholog.upstream_gene}-{NextOrtholog.downstream_gene}\t{NextOrtholog.start}-{NextOrtholog.stop}")
-    elif direct == 'Reverse':
-        loc_info[switch].insert(
-            0, f"{NextGene.upstream_gene}-{NextGene.downstream_gene}\t{NextGene.start}-{NextGene.stop}")
-        loc_info[switchFlag(switch)].insert(
-            0, f"{NextOrtholog.upstream_gene}-{NextOrtholog.downstream_gene}\t{NextOrtholog.start}-{NextOrtholog.stop}")
+    up_down = f"{NextGene.upstream_gene}-{NextGene.downstream_gene}"
+    start_stop = f"{NextGene.start}-{NextGene.stop}"
+    full_misc = f"{up_down}\t{start_stop}"
+
+    up_down_orth = f"{NextOrtholog.upstream_gene}-{NextOrtholog.downstream_gene}"
+    start_stop_orth = f"{NextOrtholog.start}-{NextOrtholog.stop}"
+    full_misc_orth = f"{up_down_orth}\t{start_stop_orth}"
+
+    if direct == 'Downstream':
+        loc_info[switch].append(full_misc)
+        loc_info[switchFlag(switch)].append(full_misc_orth)
+    elif direct == 'Upstream':
+        loc_info[switch].insert(0, full_misc)
+        loc_info[switchFlag(switch)].insert(0, full_misc_orth)
     return 0
 
 

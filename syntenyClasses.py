@@ -1,18 +1,18 @@
 '''
 '''
-import sys
 
 
 class SummaryFileEntry:
     def __init__(self, line):
         self.values = line.strip().split('\t')
+        self.cluster = self.values[1]
         self.genome = self.values[3]
         self.gene = self.values[4]
         self.annotation_fields = [12, 13, 14, 15, 16, 19]
         if self.testAnnotationFieldsValid():
             self.annotations = self.parseLine()
         else:
-            self.annotations = ['No_annotations']
+            self.annotations = self.parseIncompleteLine()
 
     def testAnnotationFieldsValid(self):
         if len(self.values) > self.annotation_fields[-1]:
@@ -25,6 +25,15 @@ class SummaryFileEntry:
 
     def parseLine(self):
         return [self.values[v] for v in self.annotation_fields]
+
+    def parseIncompleteLine(self):
+        annotations = []
+        for field in self.annotation_fields:
+            try:
+                annotations.append(self.values[field])
+            except IndexError:
+                annotations.append('No_annotation')
+        return annotations
 
 
 class OrthologFileEntry:
@@ -57,6 +66,7 @@ class GeneCallEntry:
                 self.values) in [10, 11, 12], 'Invalid number of fields in GeneCallEntry'
             self.entry_list = self.values[0:4]
             self.gene, self.contig, self.start, self.stop = self.entry_list
+            self.strand = self.values[4]
             self.testValues()
         else:
             self.gene, self.contig, self.start, self.stop = [None] * 4
