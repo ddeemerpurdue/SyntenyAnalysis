@@ -1,4 +1,5 @@
 '''
+
 '''
 from collections import namedtuple
 import os
@@ -7,6 +8,7 @@ import sys
 import syntenyClasses as SC
 
 
+'''
 def mineSummaryFile(summary_file, genome_name):
     gene_to_annotation = {}
     count = 0
@@ -23,6 +25,7 @@ def mineSummaryFile(summary_file, genome_name):
     else:
         raise ValueError(
             f'Genome: {genome_name} was not found in the summary file.')
+'''
 
 
 def mineOrthologFile(ortholog_file):
@@ -42,23 +45,24 @@ def mineOrthologFile(ortholog_file):
     return orthologs
 
 
-def mineGeneCalls(genecall_file, valid_gene_ids):
+def mineGff3File(gff3_file):
     gene_loci = {}
-    with open(genecall_file) as file:  # TODO: Below
-        if 'GCA' in genecall_file or 'GCF' in os.path.basename(genecall_file):
-            if '-' in os.path.basename(genecall_file):
-                next(file)  # Skip header :-)
-
+    with open(gff3_file) as file:  # TODO: Below
+        # if 'GCA' in gff3_file or 'GCF' in os.path.basename(gff3_file):
+        #     if '-' in os.path.basename(gff3_file):
+        #         next(file)  # Skip header :-)
+        next(file)
         current_line = file.readline().strip()
+        # print(current_line)
         upstream_line = None
         UpstreamGeneEntry = SC.GeneCallEntry('-')
         while current_line:
             CurrentGeneEntry = SC.GeneCallEntry(current_line)
 
-            if not geneInValidGeneIDs(CurrentGeneEntry, valid_gene_ids):
-                upstream_line = current_line
-                current_line = file.readline().strip()
-                continue
+            # if not geneInValidGeneIDs(CurrentGeneEntry, valid_gene_ids):
+            #     upstream_line = current_line
+            #     current_line = file.readline().strip()
+            #     continue
 
             if sameContigAsUpstream(CurrentGeneEntry.contig, UpstreamGeneEntry.contig):
                 CurrentGeneEntry.setUpstreamEntry(upstream_line)
@@ -107,6 +111,7 @@ def getGenomeNames(ortholog_file, override):
             return genomes[0], genomes[1]
 
 
+'''
 def grabValidGeneIds(gene_to_annotation, gff=False):
     # TODO Can remove genetoannotation
     assertError = 'Invalid number of fields in GeneCallEntry when grabbing valid gene ids'
@@ -125,6 +130,7 @@ def grabValidGeneIds(gene_to_annotation, gff=False):
                 line = file.readline()
     valid_gene_ids.sort()
     return valid_gene_ids
+'''
 
 
 def geneInValidGeneIDs(GeneCallEntry, valid_gene_ids):
@@ -149,6 +155,7 @@ def diffXElementsNotInY(x, y):
     return list(set(x) - set(y))
 
 
+'''
 def testSummaryGeneIDsMatchOrthologFile(gene_to_annotation, orthologs_a):
     summary_geneIDs = list(gene_to_annotation.keys())
     ortholog_geneIDs = list(orthologs_a.keys())
@@ -159,8 +166,10 @@ def testSummaryGeneIDsMatchOrthologFile(gene_to_annotation, orthologs_a):
         invald_ids_print = '\n'.join(invald_ids)
         raise IndexError(
             f"Could not match the following ortholog gene ids:\n{invald_ids_print}")
+'''
 
 
+'''
 def testValidGeneIDsLongerEqualSynteny(valid_gene_ids, synteny):
     if len(valid_gene_ids) >= len(synteny):
         return True
@@ -169,6 +178,7 @@ def testValidGeneIDsLongerEqualSynteny(valid_gene_ids, synteny):
         invald_ids_print = '\n'.join([str(v) for v in invald_ids])
         print(invald_ids_print)
         raise ValueError('More genes in synteny file than valid gene ids.')
+'''
 
 
 # ~~~
@@ -203,34 +213,41 @@ def geneIsValid(gene, ignore, ortholog_dic, no_orthos):
 
 def getOrtholog(orthologs, gene):
     assert isinstance(gene, str), 'Gene was not passed as a string!'
+    try:
+        return orthologs[gene]
+    except ValueError:
+        sys.exit(f'Gene: {gene} does not have an ortholog!')
 
-    return orthologs[gene]
 
-
-def setCurrentOrthologsSynteny(GeneCallEntry, orthologs, synteny, switch):
+def setOrthologGeneCall(GeneCallEntry, orthologs, _gene_calls_, switch):
     if switch == 0:
         current_ortholog = getOrtholog(orthologs.X, GeneCallEntry.gene)
     elif switch == 1:
         current_ortholog = getOrtholog(orthologs.Y, GeneCallEntry.gene)
 
     try:
-        return synteny[switchFlag(switch)][current_ortholog]
+        return _gene_calls_[switchFlag(switch)][current_ortholog]
     except KeyError:
         raise KeyError(
-            f"Current ortholog:-{current_ortholog}- is not in synteny {switchFlag(switch)}")
+            f"Current ortholog:-{current_ortholog}- is not in _gene_calls_ {switchFlag(switch)}")
 
 
-def appendIgnore(ignore, gene):
-    assert isinstance(gene, str), 'Gene was not passed as a string!'
-    if gene in ignore:
+def appendIgnore(ignore, GeneCallEntry):
+    # assert isinstance(gene, str), 'Gene was not passed as a string!'
+    testGeneCallEntry(GeneCallEntry)
+    if GeneCallEntry in ignore:
         return 0
-    ignore.add(gene)
+    ignore.add(GeneCallEntry)
     return 0
 
 
-def appendBothIgnore(ignore, switch, gene, ortholog):
-    appendIgnore(ignore[switch], gene)
-    appendIgnore(ignore[switchFlag(switch)], ortholog)
+def appendBothIgnore(ignore, switch, Gene, Ortholog):
+    # TODO: modify tetGeneCallEntry to have variable vars passed
+    # and loop to unpack and test
+    testGeneCallEntry(Gene)
+    testGeneCallEntry(Ortholog)
+    appendIgnore(ignore[switch], Gene)
+    appendIgnore(ignore[switchFlag(switch)], Ortholog)
     return 0
 
 
@@ -248,12 +265,6 @@ def moveBothStream(synteny, CurrentGene, CurrentOrtholog, switch):
 
 def testGeneCallEntry(GeneCallEntry):
     assert type(GeneCallEntry) == SC.GeneCallEntry, 'GeneCallEntry not passed.'
-    return 0
-
-
-def addCurrentGeneToList(GeneCallEntry, list_):
-    testGeneCallEntry(GeneCallEntry)
-    list_.append(GeneCallEntry.gene)
     return 0
 
 
@@ -379,42 +390,121 @@ def switchFlag(flag):
         raise ValueError
 
 
-def appendValues(values, switch, NextGene, NextOrtholog, direct):
+'''
+def addCurrentGeneToList(GeneCallEntry, list_):
+    testGeneCallEntry(GeneCallEntry)
+    list_.append(GeneCallEntry.gene)
+    return 0
+'''
+
+
+def appendValues(values, switch, NextGene, NextOrtholog, SeedDirection):
     testGeneCallEntry(NextGene)
-    if direct == 'Downstream':
-        values[switch].append(NextGene.gene)
-        values[switchFlag(switch)].append(NextOrtholog.gene)
-    elif direct == 'Upstream':
-        values[switch].insert(0, NextGene.gene)
-        values[switchFlag(switch)].insert(0, NextOrtholog.gene)
+    if SeedDirection.direction_x == 'Downstream':
+        values[switch].append(NextGene)
+        values[switchFlag(switch)].append(NextOrtholog)
+    elif SeedDirection.direction_x == 'Upstream':
+        values[switch].insert(0, NextGene)
+        values[switchFlag(switch)].insert(0, NextOrtholog)
     return 0
 
 
-def appendMiscValues(loc_info, switch, NextGene, NextOrtholog, direct):
-    '''
-    Need some checks here
-    '''
-    testGeneCallEntry(NextGene)
-    up_down = f"{NextGene.upstream_gene}-{NextGene.downstream_gene}"
-    start_stop = f"{NextGene.start}-{NextGene.stop}"
+def processAttributeLine(Gene):
+    testGeneCallEntry(Gene)
+
+    attributes = Gene.attributes
+    values = attributes.split(';')
+    annotation_dic = {}
+    for value_pair in values:
+        try:
+            annotation, description = value_pair.split('=', 1)
+            annotation_dic[annotation] = description
+        except ValueError:
+            raise ValueError(
+                f'Too many values to unpack for: {value_pair} in \n{Gene.gene}')
+
+    return annotation_dic
+
+
+def formatAttributeLineForWriting(Gene, ortho=False):
+    annotations = ['Transfer_RNAs', 'COG20_CATEGORY', 'COG20_PATHWAY',
+                   'COG20_FUNCTION', 'KEGG_Module', 'KEGG_Class', 'KOfam',
+                   'FigFams', 'Pfam', 'TIGRFAM']
+    if ortho:
+        annotations.reverse()
+    annotation_dic = processAttributeLine(Gene)
+    formatted_line = ''
+    for annotation in annotations:
+        try:
+            description = annotation_dic[annotation]
+            # evalue = annotation_dic[f"{annotation}-eval"]
+            formatted_line += f'{description}\t'
+        except KeyError:
+            raise IndexError(
+                f'Annotation {annotation} not found in Gene {Gene.gene}')
+    return ''.join(formatted_line.rsplit('\t', 1))  # Replace last \t with ''
+
+
+def formatWriteLine(Gene=False, Ortholog=False):
+    if Gene:
+        testGeneCallEntry(Gene)
+    if Ortholog:
+        testGeneCallEntry(Ortholog)
+
+    if Gene:
+        gene = Gene.gene
+        contig = Gene.contig
+        up_down = f"{Gene.upstream_gene}-{Gene.downstream_gene}"
+        start_stop = f"{Gene.start}-{Gene.stop}"
+        annotations = formatAttributeLineForWriting(Gene)
+        gene_line = '\t'.join([annotations, contig, up_down, start_stop, gene])
+
+    if Ortholog:
+        ortholog = Ortholog.gene
+        contig_ortho = Ortholog.contig
+        up_down_orth = f"{Ortholog.upstream_gene}-{Ortholog.downstream_gene}"
+        start_stop_orth = f"{Ortholog.start}-{Ortholog.stop}"
+        annotations_orth = formatAttributeLineForWriting(Ortholog, ortho=True)
+        ortho_line = '\t'.join(
+            [ortholog, start_stop_orth, up_down_orth, contig_ortho, annotations_orth])
+
+    if (Gene and Ortholog):
+        return '\t'.join([gene_line, ortho_line]) + '\n'
+    elif Gene:
+        ortho_line = '\t'.join([''] * 14)
+        return '\t'.join([gene_line, ortho_line]) + '\n'
+    elif Ortholog:
+        gene_line = '\t'.join([''] * 14)
+        return '\t'.join([gene_line, ortho_line]) + '\n'
+    else:
+        raise ValueError('Neither Gene nor Ortholog were provided!')
+
+
+'''
+def appendMiscValues(loc_info, switch, Gene, Ortholog, SeedDirection):
+    testGeneCallEntry(Gene)
+    up_down = f"{Gene.upstream_gene}-{Gene.downstream_gene}"
+    start_stop = f"{Gene.start}-{Gene.stop}"
     full_misc = f"{up_down}\t{start_stop}"
 
-    up_down_orth = f"{NextOrtholog.upstream_gene}-{NextOrtholog.downstream_gene}"
-    start_stop_orth = f"{NextOrtholog.start}-{NextOrtholog.stop}"
+    up_down_orth = f"{Ortholog.upstream_gene}-{Ortholog.downstream_gene}"
+    start_stop_orth = f"{Ortholog.start}-{Ortholog.stop}"
     full_misc_orth = f"{up_down_orth}\t{start_stop_orth}"
 
-    if direct == 'Downstream':
+    if SeedDirection.direction_x == 'Downstream':
         loc_info[switch].append(full_misc)
         loc_info[switchFlag(switch)].append(full_misc_orth)
-    elif direct == 'Upstream':
+    elif SeedDirection.direction_x == 'Upstream':
         loc_info[switch].insert(0, full_misc)
         loc_info[switchFlag(switch)].insert(0, full_misc_orth)
     return 0
+# REFORMAT FOR WRITING ONLY, NOT LOOP-RECORDING!!!
+'''
 
 
-def recordSyntenyInStone(synteny_dic, Seed, values, loc_info):
+def recordSyntenyInStone(synteny_dic, Seed, values):
     testGeneCallEntry(Seed)
-    synteny_dic[Seed.gene] = [values[0], values[1], loc_info[0], loc_info[1]]
+    synteny_dic[Seed.gene] = [values[0], values[1]]
 
 
 def testNext(direction_y, upstr_gene, downstr_gene):
