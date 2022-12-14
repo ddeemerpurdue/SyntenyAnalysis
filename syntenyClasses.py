@@ -1,5 +1,6 @@
 '''
 '''
+import sys
 
 
 class SummaryFileEntry:
@@ -44,19 +45,26 @@ class OrthologFileEntry:
         self.b_ortholog = self.getBGenes()
 
     def getAGenes(self):
-        a_genes = [gene.split('|')[0].strip()
+        a_genes = [gene.split('_')[-1]
                    for gene in self.values[1].split(',')]
+        # a_genes = [gene.split('|')[0].strip()
+        #            for gene in self.values[1].split(',')]
         return a_genes
 
     def getBGenes(self):
-        b_genes = self.values[2].split(',')[0].split('|')[0].strip()
-        return b_genes
+        b_gene = self.values[2].split(',')[0].split('_')[-1].strip()
+        # b_genes = [gene.split('_')[-1] for gene in self.values[2].split(',')]
+        # b_genes = self.values[2].split(',')[0].split('|')[0].strip()
+        return b_gene
 
 
 class GeneCallEntry:
-    def __init__(self, line):
+    def __init__(self, line, no_val=False, id_=None):
         self.line = line
-        if line == '+':
+        if no_val:
+            self.gene, self.contig, self.start, self.stop = [None] * 4
+            self.id_ = id_
+        elif line == '+':
             self.gene, self.contig, self.start, self.stop = ['+'] * 4
         elif line == '-':
             self.gene, self.contig, self.start, self.stop = ['-'] * 4
@@ -76,11 +84,14 @@ class GeneCallEntry:
             self.gene, self.contig, self.start, self.stop = [None] * 4
 
     def setSelfGene(self, attributes):
+        # TODO - Change this up
         values = attributes.split(';')
         for value_pair in values:
             values = value_pair.split('=')
-            if values[0] == 'Locus':
-                return values[1]
+            values = [v.strip() for v in values]
+            if values[0] == 'ID':
+                gene = str(values[1].split('.')[-1])
+                return gene
         raise ValueError(
             f'Locus field not found in attribute line: {attributes}')
 
@@ -98,7 +109,11 @@ class GeneCallEntry:
         return 0
 
     def setUpstreamEntry(self, line):
-        if line is None:
+        if self.gene is None:
+            self.upstream_entry_list = [None] * 4
+            self.upstream_gene, self.upstream_contig = [None, None]
+            self.upstream_start, self.upstream_stop = [None, None]
+        elif line is None:
             self.upstream_entry_list = ['-'] * 4
             self.upstream_gene, self.upstream_contig = ['-', '-']
             self.upstream_start, self.upstream_stop = ['-', '-']
@@ -115,7 +130,11 @@ class GeneCallEntry:
             self.upstream_gene = self.setSelfGene(self.upstream_attributes)
 
     def setDownstreamEntry(self, line):
-        if line is None:
+        if self.gene is None:
+            self.downstream_entry_list = [None] * 4
+            self.downstream_gene, self.downstream_contig = [None, None]
+            self.downstream_start, self.downstream_stop = [None, None]
+        elif line is None:
             self.downstream_entry_list = ['+'] * 4
             self.downstream_gene, self.downstream_contig = ['+', '+']
             self.downstream_start, self.downstream_stop = ['+', '+']
@@ -142,11 +161,17 @@ class SeedDirection:
     def __init__(self):
         self.seed_direction = 'Forward'
         self.direction_x = 'Downstream'
-        self.direction_y = 'Upstream'
+        self.direction_y = 'Neither'
 
     def changeSeedAndXDirection(self):
         self.seed_direction = 'Reverse'
         self.direction_x = 'Upstream'
+        if self.direction_y == 'Upstream':
+            self.direction_y = 'Downstream'
+        elif self.direction_y == 'Downstream':
+            self.direction_y = 'Upstream'
+        else:
+            self.direction_y = 'Neither'
         return 0
 
     def restartFromSeed(self):

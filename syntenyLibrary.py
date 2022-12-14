@@ -45,7 +45,7 @@ def mineOrthologFile(ortholog_file):
     return orthologs
 
 
-def mineGff3File(gff3_file):
+def mineGff3File(gff3_file, type_field):
     gene_loci = {}
     with open(gff3_file) as file:  # TODO: Below
         # if 'GCA' in gff3_file or 'GCF' in os.path.basename(gff3_file):
@@ -58,6 +58,9 @@ def mineGff3File(gff3_file):
         UpstreamGeneEntry = SC.GeneCallEntry('-')
         while current_line:
             CurrentGeneEntry = SC.GeneCallEntry(current_line)
+            if CurrentGeneEntry.type != type_field:
+                current_line = file.readline().strip()
+                continue
 
             # if not geneInValidGeneIDs(CurrentGeneEntry, valid_gene_ids):
             #     upstream_line = current_line
@@ -111,28 +114,6 @@ def getGenomeNames(ortholog_file, override):
             return genomes[0], genomes[1]
 
 
-'''
-def grabValidGeneIds(gene_to_annotation, gff=False):
-    # TODO Can remove genetoannotation
-    assertError = 'Invalid number of fields in GeneCallEntry when grabbing valid gene ids'
-    if not gff:
-        valid_gene_ids = list(gene_to_annotation.keys())
-    else:
-        valid_gene_ids = []
-        with open(gff) as file:
-            line = file.readline()
-            if 'GCA' in gff or 'GCF' in os.path.basename(gff):
-                if '-' in os.path.basename(gff):  # TODO
-                    line = file.readline()
-            assert len(line.split('\t')) in [10, 11, 12], assertError
-            while line:
-                valid_gene_ids.append(line.split('\t')[0])
-                line = file.readline()
-    valid_gene_ids.sort()
-    return valid_gene_ids
-'''
-
-
 def geneInValidGeneIDs(GeneCallEntry, valid_gene_ids):
     # TODO: Currently the traverseSynteny cannot have
     # valid gene ids == 'all'
@@ -153,32 +134,6 @@ def diffXElementsNotInY(x, y):
     x = [str(v) for v in x]
     y = [str(v) for v in y]
     return list(set(x) - set(y))
-
-
-'''
-def testSummaryGeneIDsMatchOrthologFile(gene_to_annotation, orthologs_a):
-    summary_geneIDs = list(gene_to_annotation.keys())
-    ortholog_geneIDs = list(orthologs_a.keys())
-    if allXElementsInY(ortholog_geneIDs, summary_geneIDs):
-        return True
-    else:
-        invald_ids = diffXElementsNotInY(ortholog_geneIDs, summary_geneIDs)
-        invald_ids_print = '\n'.join(invald_ids)
-        raise IndexError(
-            f"Could not match the following ortholog gene ids:\n{invald_ids_print}")
-'''
-
-
-'''
-def testValidGeneIDsLongerEqualSynteny(valid_gene_ids, synteny):
-    if len(valid_gene_ids) >= len(synteny):
-        return True
-    else:
-        invald_ids = diffXElementsNotInY(synteny, valid_gene_ids)
-        invald_ids_print = '\n'.join([str(v) for v in invald_ids])
-        print(invald_ids_print)
-        raise ValueError('More genes in synteny file than valid gene ids.')
-'''
 
 
 # ~~~
@@ -228,8 +183,14 @@ def setOrthologGeneCall(GeneCallEntry, orthologs, _gene_calls_, switch):
     try:
         return _gene_calls_[switchFlag(switch)][current_ortholog]
     except KeyError:
-        raise KeyError(
-            f"Current ortholog:-{current_ortholog}- is not in _gene_calls_ {switchFlag(switch)}")
+        print(f'Setting a NONE value GeneCallEntry for {current_ortholog}')
+        blank = SC.GeneCallEntry(
+            line="NONE", no_val=True, id_=str(current_ortholog))
+        blank.setDownstreamEntry(line="NONE")
+        blank.setUpstreamEntry(line="NONE")
+        return blank
+        # raise KeyError(
+        # f"Current ortholog:-'{current_ortholog}' is not in _gene_calls_ {switchFlag(switch)}")
 
 
 def appendIgnore(ignore, GeneCallEntry):
@@ -268,8 +229,8 @@ def testGeneCallEntry(GeneCallEntry):
     return 0
 
 
-def directionNotNeither(direction):
-    if direction == 'Neither':
+def directionXNotNeither(SeedDirection):
+    if SeedDirection.direction_x == 'Neither':
         return False
     else:
         return True
@@ -301,12 +262,12 @@ def endOfContig(GeneCallEntry, direction):
     testGeneCallEntry(GeneCallEntry)
     end_flag = assignDirectionEndFlag(direction)
 
-    if GeneCallEntry.upstream_gene == '-':
-        if end_flag in ['-']:
-            return True
-    elif GeneCallEntry.downstream_gene == '+':
-        if end_flag in ['+']:
-            return True
+    if end_flag in ['-'] and GeneCallEntry.upstream_gene == '-':
+        return True
+    elif end_flag in ['+'] and GeneCallEntry.downstream_gene == '+':
+        return True
+    elif end_flag in ['x'] and onlyOneGeneOnContig(GeneCallEntry):
+        return True
     else:
         return False
 
@@ -324,10 +285,10 @@ def assignDirection(GeneCallEntry, CurrentSeedDirection):
             f"{GeneCallEntry.gene} determined as end but is not the case.")
 
 
-def setNextXGene(GeneCallEntry, direction_x, synteny_x, ignore):
+def setNextXGene(GeneCallEntry, SeedDirection, synteny_x, ignore):
     testGeneCallEntry(GeneCallEntry)
 
-    if direction_x == 'Downstream':
+    if SeedDirection.direction_x == 'Downstream':
         if GeneCallEntry.downstream_gene == '+':
             return SC.GeneCallEntry('+')
         elif GeneCallEntry.downstream_gene not in ignore:
@@ -335,17 +296,19 @@ def setNextXGene(GeneCallEntry, direction_x, synteny_x, ignore):
             return synteny_x[GeneCallEntry.downstream_gene]
         else:
             return SC.GeneCallEntry(None)
-    elif direction_x == 'Upstream':
+    elif SeedDirection.direction_x == 'Upstream':
         if GeneCallEntry.upstream_gene == '-':
             return SC.GeneCallEntry('-')
         elif GeneCallEntry.upstream_gene not in ignore:
             return synteny_x[GeneCallEntry.upstream_gene]
         else:
             return SC.GeneCallEntry(None)
-    elif direction_x == 'Neither':
-        raise ValueError(f'Direction {direction_x} should not be Neither.')
+    elif SeedDirection.direction_x == 'Neither':
+        raise ValueError(
+            f'Direction {SeedDirection.direction_x} should not be Neither.')
     else:
-        raise ValueError(f'Direction {direction_x} improperly set')
+        raise ValueError(
+            f'Direction {SeedDirection.direction_x} improperly set')
 
 
 def onlyOneGeneOnContig(CurrentGene):
@@ -390,16 +353,9 @@ def switchFlag(flag):
         raise ValueError
 
 
-'''
-def addCurrentGeneToList(GeneCallEntry, list_):
-    testGeneCallEntry(GeneCallEntry)
-    list_.append(GeneCallEntry.gene)
-    return 0
-'''
-
-
 def appendValues(values, switch, NextGene, NextOrtholog, SeedDirection):
     testGeneCallEntry(NextGene)
+    testGeneCallEntry(NextOrtholog)
     if SeedDirection.direction_x == 'Downstream':
         values[switch].append(NextGene)
         values[switchFlag(switch)].append(NextOrtholog)
@@ -411,9 +367,12 @@ def appendValues(values, switch, NextGene, NextOrtholog, SeedDirection):
 
 def processAttributeLine(Gene):
     testGeneCallEntry(Gene)
-
-    attributes = Gene.attributes
-    values = attributes.split(';')
+    print(Gene.gene)
+    try:
+        attributes = Gene.attributes
+    except AttributeError:
+        attributes = f'ID={Gene.id_};product=NotAnnotatedEntry'
+    values = [v.strip() for v in attributes.split(';')]
     annotation_dic = {}
     for value_pair in values:
         try:
@@ -427,21 +386,32 @@ def processAttributeLine(Gene):
 
 
 def formatAttributeLineForWriting(Gene, ortho=False):
-    annotations = ['Transfer_RNAs', 'COG20_CATEGORY', 'COG20_PATHWAY',
-                   'COG20_FUNCTION', 'KEGG_Module', 'KEGG_Class', 'KOfam',
-                   'FigFams', 'Pfam', 'TIGRFAM']
+    # annotations = ['FigFams', 'FigFams-ACC', 'FigFams-eval', 'KEGG_Module', 'KEGG_Module-ACC',
+    #                'KEGG_Module-eval', 'COG20_PATHWAY', 'COG20_PATHWAY-ACC', 'COG20_PATHWAY-eval',
+    #                'TIGRFAM', 'TIGRFAM-ACC', 'TIGRFAM-eval', 'KOfam', 'KOfam-ACC', 'KOfam-eval', 'KEGG_Class',
+    #                'KEGG_Class-ACC', 'KEGG_Class-eval', 'Transfer_RNAs', 'Transfer_RNAs-ACC', 'Transfer_RNAs-eval',
+    #                'COG20_FUNCTION', 'COG20_FUNCTION-ACC', 'COG20_FUNCTION-eval', 'Pfam', 'Pfam-ACC', 'Pfam-eval',
+    #                'COG20_CATEGORY', 'COG20_CATEGORY-ACC', 'COG20_CATEGORY-eval']
+    annotations = ['ID', 'product']
     if ortho:
         annotations.reverse()
     annotation_dic = processAttributeLine(Gene)
+    print(f'The annotation_dic={annotation_dic}')
+
     formatted_line = ''
     for annotation in annotations:
         try:
-            description = annotation_dic[annotation]
+            description = str(annotation_dic[annotation])
+            print(
+                f'The key is: {annotation}, the description is: {description}')
             # evalue = annotation_dic[f"{annotation}-eval"]
             formatted_line += f'{description}\t'
         except KeyError:
-            raise IndexError(
-                f'Annotation {annotation} not found in Gene {Gene.gene}')
+            description = ' '
+            formatted_line += f'{description}\t'
+            # raise IndexError(
+            #    f'Annotation {annotation} not found in Gene {Gene.gene}')
+    print(f'The whole line is: {formatted_line}')
     return ''.join(formatted_line.rsplit('\t', 1))  # Replace last \t with ''
 
 
@@ -457,6 +427,7 @@ def formatWriteLine(Gene=False, Ortholog=False):
         up_down = f"{Gene.upstream_gene}-{Gene.downstream_gene}"
         start_stop = f"{Gene.start}-{Gene.stop}"
         annotations = formatAttributeLineForWriting(Gene)
+        print(f'Gene Annotations: {annotations}')
         gene_line = '\t'.join([annotations, contig, up_down, start_stop, gene])
 
     if Ortholog:
@@ -465,16 +436,17 @@ def formatWriteLine(Gene=False, Ortholog=False):
         up_down_orth = f"{Ortholog.upstream_gene}-{Ortholog.downstream_gene}"
         start_stop_orth = f"{Ortholog.start}-{Ortholog.stop}"
         annotations_orth = formatAttributeLineForWriting(Ortholog, ortho=True)
+        print(f'Ortholog Annotations: {annotations_orth}')
         ortho_line = '\t'.join(
-            [ortholog, start_stop_orth, up_down_orth, contig_ortho, annotations_orth])
+            [str(ortholog), str(start_stop_orth), str(up_down_orth), str(contig_ortho), annotations_orth])
 
     if (Gene and Ortholog):
         return '\t'.join([gene_line, ortho_line]) + '\n'
     elif Gene:
-        ortho_line = '\t'.join([''] * 14)
+        ortho_line = '\t'.join([''] * 34)
         return '\t'.join([gene_line, ortho_line]) + '\n'
     elif Ortholog:
-        gene_line = '\t'.join([''] * 14)
+        gene_line = '\t'.join([''] * 34)
         return '\t'.join([gene_line, ortho_line]) + '\n'
     else:
         raise ValueError('Neither Gene nor Ortholog were provided!')

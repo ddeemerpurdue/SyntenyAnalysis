@@ -8,142 +8,141 @@ def traverseSynteny(gffA_file, gffB_file, ortholog_file, override=False):
     genome_a, genome_b = SL.getGenomeNames(ortholog_file, override)
 
     _orthologs_ = SL.mineOrthologFile(ortholog_file)
+    print(_orthologs_)
 
-    A_Genecalls = SL.mineGff3File(gffA_file)
-    B_Genecalls = SL.mineGff3File(gffB_file)
+    A_Genecalls = SL.mineGff3File(gffA_file, type_field="gene")
+    B_Genecalls = SL.mineGff3File(gffB_file, type_field="gene")
     _gene_calls_ = [A_Genecalls, B_Genecalls]
+    # tmp = _gene_calls_[0].keys()
+    # tmp = sorted(tmp)
+    # print('A_Genecalls')
+    # print(tmp)
+    # tmp = _gene_calls_[1].keys()
+    # tmp = sorted(tmp)
+    # print('B_Genecalls')
+    # print(tmp)
 
     ignore = [set(), set()]
-    no_orthos = []
+    no_orthos = [set(), set()]
+    already_analyzed_a = []
+    already_analyzed_b = []
 
     ignore_count = 0
     append_ = False
 
     runs = 0
-    top_ignore = 0
-    mid_top_ignore = 0
-    body_ignore = 0
 
     for top_count, gene in enumerate(A_Genecalls):
         switch = 0
         CurrentSeedDirection = SC.SeedDirection()
         CurrentGene = A_Genecalls[gene]
 
-        if SL.geneInIgnore(CurrentGene, ignore[switch]):
-            top_ignore += 1
+        if SL.geneInIgnore(CurrentGene, ignore[switch]):  # already analyzed
             ignore_count += 1
             continue
-        elif not SL.geneHasOrtholog(gene, _orthologs_):
-            no_orthos.append(gene)
+        if not SL.geneHasOrtholog(gene, _orthologs_):
+            no_orthos[switch].add(CurrentGene.gene)
             continue
 
         CurrentOrtholog = SL.setOrthologGeneCall(
             CurrentGene, _orthologs_, _gene_calls_, switch)
-
-        SL.appendBothIgnore(ignore, switch, CurrentGene, CurrentOrtholog)  # IC
-
-        mid_top_ignore += 1
-
-        # Maybe a class or a named tuple?
+        SL.appendBothIgnore(ignore, switch, CurrentGene, CurrentOrtholog)
         values = [[], []]
-        #  loc_info = [[], []]  # TODO: REMOVE - DO NOT NEED!!!
 
         SL.appendValues(values, switch, CurrentGene,
                         CurrentOrtholog, CurrentSeedDirection)
-
-        # SL.appendMiscValues(loc_info, switch, CurrentGene,
-        #                     CurrentOrtholog, CurrentSeedDirection)
 
         Seed = CurrentGene
         SeedOrtholog = CurrentOrtholog
 
         while True:
-            if SL.directionNotNeither(CurrentSeedDirection.direction_x):
-                NextGene = SL.setNextXGene(
-                    CurrentGene, CurrentSeedDirection.direction_x, _gene_calls_[switch], ignore[switch])
-            else:
-                if SL.onlyOneGeneOnContig(CurrentGene):
-                    append_ = True
-                    switch = 0  # Dont think I need this
-                    if CurrentSeedDirection.restartFromSeed():
-                        CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
-                    else:
-                        break
+            # SETTING THE NEXT GENE
+            if SL.onlyOneGeneOnContig(CurrentGene):
+                append_ = True
+                if CurrentSeedDirection.restartFromSeed():
+                    CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
+                    continue
                 else:
-                    NextGene, CurrentSeedDirection.direction_x = SL.setNextXGeneIfDirectionIsNeither(
-                        CurrentGene, _gene_calls_[switch], ignore[switch])
+                    break
+            elif SL.directionXNotNeither(CurrentSeedDirection):
+                NextGene = SL.setNextXGene(
+                    CurrentGene, CurrentSeedDirection, _gene_calls_[switch], ignore[switch])
+            else:
+                NextGene, CurrentSeedDirection.direction_x = SL.setNextXGeneIfDirectionIsNeither(
+                    CurrentGene, _gene_calls_[switch], ignore[switch])
 
-            # SUB 1A - NEXT GENE IS NONE
             if NextGene.gene is None:
                 break
 
-            # SUB 1B - NEXT GENE HAS AN ORTHOLOG
-            elif SL.geneHasOrtholog(NextGene.gene, _orthologs_, switch=switch):
-                NextOrtholog = SL.setOrthologGeneCall(
-                    NextGene, _orthologs_, _gene_calls_, switch)
-
-                if NextOrtholog.gene == CurrentOrtholog.downstream_gene:
-                    CurrentSeedDirection.direction_y = 'Downstream'
-                    append_ = True
-                    CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
-
-                elif NextOrtholog.gene == CurrentOrtholog.upstream_gene:
-                    CurrentSeedDirection.direction_y = 'Upstream'
-                    append_ = True
-                    CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
-
-                else:
-                    if (SL.endOfContig(CurrentOrtholog, CurrentSeedDirection.direction_y) and
-                            SL.endOfContig(NextOrtholog, direction='Neither')):
-                        SL.assignDirection(NextOrtholog)
-                        CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
-                        append_ = True
-                    else:
-                        switch = 0
-                        if CurrentSeedDirection.restartFromSeed():
-                            CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
-                        else:
-                            break
-
-            # SUB 1C - NEXT GENE IS ACTUALLY A +/-
-            elif SL.geneIsEndFlag(NextGene):
+            # NextGene is [+, -]
+            if SL.geneIsEndFlag(NextGene):
                 CurrentGene, CurrentOrtholog = CurrentOrtholog, CurrentGene
                 CurrentSeedDirection.XtoYandYtoNeither()
 
-                if SL.endOfContig(CurrentGene, CurrentSeedDirection.direction_x) or SL.onlyOneGeneOnContig(CurrentGene):
-                    switch = 0
+                if SL.endOfContig(CurrentGene, CurrentSeedDirection.direction_x):
                     if CurrentSeedDirection.restartFromSeed():
                         CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
+                        switch = 0
+                        continue
                     else:
                         break
                 else:
                     switch = SL.switchFlag(switch)
+                    continue
 
-            else:
-                # if CurrentSeedDirection.direction_x == 'Downstream':
-                #     no_orthos.append(gene)
-                switch = 0
+            # NextGene has no ortholog
+            if not SL.geneHasOrtholog(NextGene.gene, _orthologs_, switch=switch):
+                no_orthos[switch].add(NextGene.gene)
                 if CurrentSeedDirection.restartFromSeed():
                     CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
+                    switch = 0
+                    continue
                 else:
                     break
+
+            NextOrtholog = SL.setOrthologGeneCall(
+                NextGene, _orthologs_, _gene_calls_, switch)
+            # print(NextGene.gene)
+            # print(f'NextOrtholog.gene={NextOrtholog.gene}')
+            # print(f'CurrentOrtholog.gene={CurrentOrtholog.gene}')
+            # print(f'Dn NextOrtho={NextOrtholog.downstream_gene}')
+            # print(f'Dn CurrOtho={CurrentOrtholog.downstream_gene}')
+            if NextOrtholog.gene == CurrentOrtholog.downstream_gene:
+                CurrentSeedDirection.direction_y = 'Downstream'
+                append_ = True
+                CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
+
+            elif NextOrtholog.gene == CurrentOrtholog.upstream_gene:
+                CurrentSeedDirection.direction_y = 'Upstream'
+                append_ = True
+                CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
+
+            else:
+                if (SL.endOfContig(CurrentOrtholog, CurrentSeedDirection.direction_y) and
+                        SL.endOfContig(NextOrtholog, direction='Neither')):
+                    SL.assignDirection(NextOrtholog, CurrentSeedDirection)
+                    CurrentGene, CurrentOrtholog = NextGene, NextOrtholog
+                    append_ = True
+                elif NextOrtholog.gene is None:
+                    break
+                else:
+                    if CurrentSeedDirection.restartFromSeed():
+                        switch = 0
+                        CurrentGene, CurrentOrtholog = Seed, SeedOrtholog
+                    else:
+                        break
 
             if append_:
                 SL.appendBothIgnore(
                     ignore, switch, NextGene, NextOrtholog)
                 SL.appendValues(values, switch, CurrentGene,
                                 CurrentOrtholog, CurrentSeedDirection)
-                #  SL.appendMiscValues(loc_info, switch, NextGene,
-                #                    NextOrtholog, CurrentSeedDirection)
                 append_ = False
         # Out of while loop
         runs += 1
         SL.recordSyntenyInStone(synteny_dic, Seed, values)
         append_ = False
 
-    print(f"Total genes in A: {len(A_Genecalls.keys())}")
-    print(f"Total genes in B: {len(B_Genecalls.keys())}")
-    print(f"Runs: {runs}")
     c = 0
     all_written_x = set()
     all_written_y = set()
@@ -151,14 +150,15 @@ def traverseSynteny(gffA_file, gffB_file, ortholog_file, override=False):
         c += len(synteny_dic[seed][0])
         for gene in synteny_dic[seed][0]:
             all_written_x.add(gene.gene)
-        for gene in synteny_dic[seed][0]:
+        for gene in synteny_dic[seed][1]:
             all_written_y.add(gene.gene)
-    print(f"Syntenic loci found: {c}")
-    no_orthos.sort()
+    # print(f"Syntenic loci found: {c}")
     a_not_written = set(A_Genecalls.keys()) - all_written_x
+    a_not_written.update(no_orthos[0])
     b_not_written = set(B_Genecalls.keys()) - all_written_y
-    print(f"Not written for a: {len(a_not_written)}")
-    print(f"Not written for b: {len(b_not_written)}")
+    b_not_written.update(no_orthos[1])
+    # print(f"Not written for a: {len(a_not_written)}")
+    # print(f"Not written for b: {len(b_not_written)}")
 
     a_not = {}
     b_not = {}
@@ -166,6 +166,5 @@ def traverseSynteny(gffA_file, gffB_file, ortholog_file, override=False):
         a_not[gene] = A_Genecalls[gene]
     for gene in b_not_written:
         b_not[gene] = B_Genecalls[gene]
-    # print(a_not)
 
     return [synteny_dic, a_not, b_not]
