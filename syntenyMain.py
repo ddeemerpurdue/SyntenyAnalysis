@@ -4,7 +4,7 @@ import sys
 
 import argparse
 
-import test as ST
+import syntenyTracker as ST
 
 
 def getBins(files):
